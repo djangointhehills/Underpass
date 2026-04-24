@@ -1,20 +1,599 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>MPC Trail Underpass Flood Status</title>
-    <script>
-        // JavaScript code for the flood status functionality goes here
-        function getFloodStatus() {
-            // Example function to get flood status
-            return "No flooding detected";
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MPC Trail — Underpass Status</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow+Condensed:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #21262d;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --clear: #3fb950;
+    --caution: #d29922;
+    --flood: #f85149;
+    --accent: #58a6ff;
+    --creek: #1c6aff;
+  }
 
-        window.onload = function() {
-            document.getElementById('floodStatus').innerHTML = getFloodStatus();
-        };
-    </script>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow Condensed', sans-serif;
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* Animated creek background */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background:
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 40px,
+        rgba(28,106,255,0.03) 40px,
+        rgba(28,106,255,0.03) 41px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 40px,
+        rgba(28,106,255,0.02) 40px,
+        rgba(28,106,255,0.02) 41px
+      );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 24px 16px 48px;
+  }
+
+  header {
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 20px;
+  }
+
+  .header-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .title-block h1 {
+    font-size: 2rem;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1;
+    color: var(--text);
+  }
+
+  .title-block h1 span {
+    color: var(--creek);
+  }
+
+  .title-block p {
+    margin-top: 6px;
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .refresh-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+
+  .refresh-btn:hover {
+    background: #1c2330;
+    border-color: var(--accent);
+  }
+
+  .refresh-btn.spinning svg {
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* Rainfall bar */
+  .rainfall-summary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+
+  .rainfall-summary h2 {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  .rain-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 60px;
+    margin-bottom: 8px;
+  }
+
+  .bar-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    justify-content: flex-end;
+    gap: 3px;
+  }
+
+  .bar {
+    width: 100%;
+    min-height: 2px;
+    transition: height 0.4s ease;
+    position: relative;
+  }
+
+  .bar.past { background: var(--accent); opacity: 0.6; }
+  .bar.future { background: var(--accent); opacity: 0.3; border-top: 1px dashed var(--accent); }
+
+  .bar-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .rain-legend {
+    display: flex;
+    gap: 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+  }
+
+  .rain-legend span { display: flex; align-items: center; gap: 5px; }
+  .dot { width: 8px; height: 8px; display: inline-block; }
+  .dot.past { background: var(--accent); opacity: 0.6; }
+  .dot.future { background: var(--accent); opacity: 0.3; border: 1px dashed var(--accent); }
+
+  .total-rain {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 10px;
+  }
+
+  .total-rain strong {
+    color: var(--text);
+    font-size: 0.85rem;
+  }
+
+  /* Underpasses */
+  .section-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .underpass-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+
+  .underpass-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    transition: border-color 0.3s;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .underpass-card.clear  { border-left-color: var(--clear); }
+  .underpass-card.caution { border-left-color: var(--caution); }
+  .underpass-card.flood  { border-left-color: var(--flood); }
+  .underpass-card.loading { border-left-color: var(--border); }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .status-icon {
+    font-size: 1.6rem;
+    line-height: 1;
+    flex-shrink: 0;
+    width: 36px;
+    text-align: center;
+  }
+
+  .underpass-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .underpass-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .underpass-note {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 2px;
+    letter-spacing: 0.03em;
+  }
+
+  .status-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 4px 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+    border: 1px solid currentColor;
+  }
+
+  .clear  .status-badge { color: var(--clear); }
+  .caution .status-badge { color: var(--caution); }
+  .flood  .status-badge { color: var(--flood); }
+  .loading .status-badge { color: var(--muted); }
+
+  /* Flood badge pulse */
+  .flood .status-badge {
+    animation: pulse-flood 1.6s ease-in-out infinite;
+  }
+
+  @keyframes pulse-flood {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* Threshold key */
+  .threshold-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 14px 16px;
+    margin-bottom: 20px;
+  }
+
+  .threshold-box h2 {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .thresholds {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .threshold-item {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    padding: 5px 10px;
+    border: 1px solid;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .threshold-item.clear  { border-color: var(--clear);  color: var(--clear); }
+  .threshold-item.caution { border-color: var(--caution); color: var(--caution); }
+  .threshold-item.flood  { border-color: var(--flood);  color: var(--flood); }
+
+  /* Footer */
+  .footer {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+    line-height: 1.7;
+  }
+
+  .footer a { color: var(--accent); text-decoration: none; }
+
+  .updated-at {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+
+  .error-msg {
+    background: rgba(248,81,73,0.1);
+    border: 1px solid rgba(248,81,73,0.3);
+    color: var(--flood);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    display: none;
+  }
+
+  .skeleton {
+    background: linear-gradient(90deg, var(--border) 25%, #2a3140 50%, var(--border) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s infinite;
+    height: 14px;
+    border-radius: 2px;
+  }
+
+  @keyframes shimmer {
+    from { background-position: 200% 0; }
+    to   { background-position: -200% 0; }
+  }
+</style>
 </head>
 <body>
-    <h1>MPC Trail Underpass Flood Status</h1>
-    <div id='floodStatus'></div>
+<div class="container">
+
+  <header>
+    <div class="header-top">
+      <div class="title-block">
+        <h1>MPC <span>Trail</span></h1>
+        <p>Underpass Flood Status</p>
+      </div>
+      <button class="refresh-btn" id="refreshBtn" onclick="loadData()">
+        <svg id="refreshIcon" width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="display:inline;vertical-align:middle;margin-right:5px">
+          <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+          <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+        </svg>
+        Refresh
+      </button>
+    </div>
+  </header>
+
+  <div class="error-msg" id="errorMsg">⚠ Could not load rainfall data. Check your connection.</div>
+
+  <div class="rainfall-summary">
+    <h2>Rainfall — Essendon / Strathmore area</h2>
+    <div class="rain-bars" id="rainBars">
+      <div style="width:100%;display:flex;align-items:center;justify-content:center">
+        <div class="skeleton" style="width:80%;height:10px"></div>
+      </div>
+    </div>
+    <div class="rain-legend">
+      <span><span class="dot past"></span> Past 6h</span>
+      <span><span class="dot future"></span> Next 3h forecast</span>
+    </div>
+    <div class="total-rain" id="rainTotals">Loading…</div>
+  </div>
+
+  <div class="section-label">Known Flood-Prone Underpasses</div>
+
+  <div class="underpass-list" id="underpassList">
+    <!-- skeleton cards -->
+    <div class="underpass-card loading">
+      <div class="status-icon">⏳</div>
+      <div class="underpass-info">
+        <div class="underpass-name"><div class="skeleton" style="width:60%;height:14px"></div></div>
+        <div class="underpass-note" style="margin-top:6px"><div class="skeleton" style="width:90%;height:10px"></div></div>
+      </div>
+      <div class="status-badge">—</div>
+    </div>
+  </div>
+
+  <div class="threshold-box">
+    <h2>Risk Thresholds (6h rainfall total)</h2>
+    <div class="thresholds">
+      <div class="threshold-item clear">✓ &lt;10mm — Clear</div>
+      <div class="threshold-item caution">⚡ 10–25mm — Caution</div>
+      <div class="threshold-item flood">⚠ &gt;25mm — Likely Flooded</div>
+    </div>
+  </div>
+
+  <div class="updated-at" id="updatedAt"></div>
+
+  <div class="footer">
+    <div>Data: <a href="https://open-meteo.com" target="_blank">Open-Meteo</a> · Approx location: Essendon/Strathmore (37.74°S, 144.91°E)</div>
+    <div>⚠ Status is rainfall-inferred, not a live water sensor. Use judgement — especially after rapid heavy falls.</div>
+  </div>
+
+</div>
+
+<script>
+// Underpasses along Moonee Ponds Creek Trail, roughly north→south
+const UNDERPASSES = [
+  {
+    name: "Ormond Rd",
+    note: "Near Pascoe Vale / Coburg North — known low point",
+    riskMultiplier: 1.2,
+  },
+  {
+    name: "Heller St / Albion St",
+    note: "Coburg — shallow underpass, pools quickly",
+    riskMultiplier: 1.3,
+  },
+  {
+    name: "Moreland Rd",
+    note: "Coburg / Brunswick West — frequently waterlogged",
+    riskMultiplier: 1.4,
+  },
+  {
+    name: "Dawson St",
+    note: "Brunswick West — low clearance underpass",
+    riskMultiplier: 1.2,
+  },
+  {
+    name: "Racecourse Rd",
+    note: "Flemington — creek bends here, backs up fast",
+    riskMultiplier: 1.5,
+  },
+];
+
+// Coords: Essendon/Strathmore — centre of MPC catchment
+const LAT = -37.74;
+const LNG = 144.91;
+
+async function loadData() {
+  const btn = document.getElementById('refreshBtn');
+  const icon = document.getElementById('refreshIcon');
+  btn.classList.add('spinning');
+
+  const errorEl = document.getElementById('errorMsg');
+  errorEl.style.display = 'none';
+
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LNG}&hourly=precipitation&timezone=Australia%2FSydney&forecast_days=2&past_days=1`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+
+    const times = data.hourly.time;
+    const rain = data.hourly.precipitation;
+
+    const now = new Date();
+    const nowHour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours());
+
+    // Find current hour index
+    let nowIdx = times.findIndex(t => new Date(t) >= nowHour);
+    if (nowIdx === -1) nowIdx = times.length - 1;
+
+    // Past 6 hours + next 3 hours
+    const past6 = [];
+    for (let i = nowIdx - 6; i < nowIdx; i++) {
+      past6.push({ time: times[i], mm: i >= 0 ? rain[i] : 0, past: true });
+    }
+    const next3 = [];
+    for (let i = nowIdx; i < nowIdx + 3; i++) {
+      next3.push({ time: times[i], mm: i < rain.length ? rain[i] : 0, past: false });
+    }
+
+    const allBars = [...past6, ...next3];
+    const past6Total = past6.reduce((s, b) => s + b.mm, 0);
+    const next3Total = next3.reduce((s, b) => s + b.mm, 0);
+
+    renderBars(allBars);
+    renderTotals(past6Total, next3Total);
+    renderUnderpasses(past6Total, next3Total);
+
+    document.getElementById('updatedAt').textContent =
+      `Updated: ${now.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })} · ${now.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}`;
+
+  } catch (e) {
+    errorEl.style.display = 'block';
+    document.getElementById('rainTotals').textContent = 'Unavailable';
+    renderUnderpasses(null, null);
+  } finally {
+    btn.classList.remove('spinning');
+  }
+}
+
+function renderBars(bars) {
+  const container = document.getElementById('rainBars');
+  const maxMm = Math.max(...bars.map(b => b.mm), 1);
+
+  container.innerHTML = bars.map(b => {
+    const pct = Math.max((b.mm / maxMm) * 100, 3);
+    const label = formatHour(b.time);
+    return `
+      <div class="bar-wrap">
+        <div class="bar ${b.past ? 'past' : 'future'}" style="height:${pct}%" title="${b.mm.toFixed(1)}mm"></div>
+        <div class="bar-label">${label}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function formatHour(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const h = d.getHours();
+  if (h === 0) return '12a';
+  if (h < 12) return h + 'a';
+  if (h === 12) return '12p';
+  return (h - 12) + 'p';
+}
+
+function renderTotals(past6, next3) {
+  document.getElementById('rainTotals').innerHTML =
+    `Past 6h: <strong>${past6.toFixed(1)}mm</strong> &nbsp;·&nbsp; Next 3h forecast: <strong>${next3.toFixed(1)}mm</strong>`;
+}
+
+function getStatus(past6mm, multiplier) {
+  if (past6mm === null) return { cls: 'loading', label: 'Unknown', icon: '?' };
+  const effective = past6mm * multiplier;
+  if (effective >= 25) return { cls: 'flood',   label: 'Likely Flooded', icon: '🌊' };
+  if (effective >= 10) return { cls: 'caution', label: 'Caution',         icon: '⚡' };
+  return { cls: 'clear',   label: 'Clear',          icon: '✓' };
+}
+
+function renderUnderpasses(past6, next3) {
+  const list = document.getElementById('underpassList');
+  list.innerHTML = UNDERPASSES.map((u, i) => {
+    const s = getStatus(past6, u.riskMultiplier);
+    const delay = i * 0.07;
+    return `
+      <div class="underpass-card ${s.cls}" style="animation-delay:${delay}s">
+        <div class="status-icon">${s.icon}</div>
+        <div class="underpass-info">
+          <div class="underpass-name">${u.name}</div>
+          <div class="underpass-note">${u.note}</div>
+        </div>
+        <div class="status-badge">${s.label}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+loadData();
+
+// Auto-refresh every 30 minutes
+setInterval(loadData, 30 * 60 * 1000);
+</script>
 </body>
 </html>
