@@ -397,6 +397,31 @@
     from { background-position: 200% 0; }
     to   { background-position: -200% 0; }
   }
+
+  h2 { font-size: 1.1rem; margin-bottom: 10px; }
+  .conditions-section, .outlook-box, .report-box, .source-notes { margin-bottom: 22px; }
+  .conditions-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+  .measurement, .outlook-box, .report-box, .source-notes { background: var(--surface); border: 1px solid var(--border); padding: 14px; }
+  .measurement h3 { font-size: 1rem; margin-bottom: 6px; }
+  .measurement .value { font-family: 'DM Mono', monospace; font-size: 1.25rem; }
+  .measurement p, .source-notes p, .footer p { margin-top: 8px; }
+  .help-text, .reading-time, .report-detail { font-size: 0.9rem; color: #a5afbb; line-height: 1.45; margin-top: 8px; }
+  .stale { color: var(--caution); }
+  .source-notes a, .report-link { color: var(--accent); }
+  .outlook-box ul { padding-left: 20px; margin-top: 12px; line-height: 1.5; }
+  label { display: block; margin: 12px 0 6px; font-size: 1rem; }
+  input, select, textarea { width: 100%; min-width: 0; background: var(--bg); border: 1px solid #475361; color: var(--text); font: inherit; font-size: 1rem; padding: 10px; color-scheme: dark; }
+  .action-btn, .report-link { background: var(--surface); border: 1px solid var(--accent); color: var(--accent); padding: 9px 12px; cursor: pointer; font: inherit; font-size: 1rem; margin: 12px 8px 0 0; }
+  .report-link { font-size: 0.9rem; padding: 5px 8px; }
+  .secondary { border-color: var(--border); }
+  .report-box summary { cursor: pointer; font-size: 1.15rem; }
+  .status-badge { font-size: 0.8rem; }
+  .total-rain, .rainfall-summary h2, .section-label, .updated-at { font-size: 0.85rem; line-height: 1.4; }
+  .rain-legend { font-size: 0.75rem; }
+  .bar-label { font-size: 0.7rem; }
+  .refresh-btn { font-size: 0.85rem; }
+  @media (max-width: 380px) { .conditions-grid { grid-template-columns: minmax(0, 1fr); } }
+  @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
@@ -408,7 +433,7 @@
         <h1>Commute <span>Crossings</span></h1>
         <p>Lower Moonee Ponds Creek · Both directions</p>
       </div>
-      <button class="refresh-btn" id="refreshBtn" onclick="loadData()">
+      <button class="refresh-btn" id="refreshBtn">
         <svg id="refreshIcon" width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="display:inline;vertical-align:middle;margin-right:5px">
           <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
           <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
@@ -419,12 +444,25 @@
   </header>
 
   <div class="route-note">
-    <p>Racecourse Road ↔ Footscray Road · The creek section of the commute, listed north to south.</p>
-    <p><strong>Passability is unconfirmed at every crossing.</strong> Rain, high tides and drainage pump problems can flood the lower trail, especially between Dynon and Footscray Roads. Low rainfall does not mean a dry path.</p>
-    <p>No live water-level, tide, pump or closure data is connected. Check conditions and signs on each trip; do not enter floodwater.</p>
+    <p>Racecourse Road ↔ Footscray Road · Both commute directions</p>
+    <p><strong>Check the crossing, not just the weather.</strong> Creek levels, tides and rain describe the conditions around the trail. They do not confirm a dry underpass. Follow closure signs and do not enter floodwater.</p>
   </div>
 
-  <div class="error-msg" id="errorMsg" role="alert">⚠ Rainfall data is unavailable or incomplete. Rainfall risk is unknown.</div>
+  <section class="conditions-section" aria-labelledby="conditionsHeading">
+    <h2 id="conditionsHeading">Measured conditions</h2>
+    <p class="help-text" id="sourceUpdated">Loading creek and tide readings…</p>
+    <div class="conditions-grid" id="conditionsGrid"></div>
+  </section>
+
+  <section class="outlook-box" aria-labelledby="outlookHeading">
+    <h2 id="outlookHeading">When you reach the creek</h2>
+    <label for="arrivalTime">Crossing time · Melbourne time</label>
+    <input id="arrivalTime" type="datetime-local" required>
+    <div id="outlook" aria-live="polite"></div>
+    <p class="help-text">These are weather and water-level indicators. Flood probabilities and crossing thresholds are not calibrated yet.</p>
+  </section>
+
+  <div class="error-msg" id="errorMsg" role="alert">⚠ Rainfall data is unavailable or incomplete. Recent and forecast rainfall are unknown.</div>
 
   <div class="rainfall-summary">
     <h2>Modelled rainfall — Essendon / Strathmore upstream sample</h2>
@@ -455,180 +493,47 @@
     </div>
   </div>
 
-  <div class="threshold-box">
-    <h2>Rainfall guide (last 6 completed hours)</h2>
-    <div class="thresholds">
-      <div class="threshold-item clear">&lt;10mm — Low rainfall risk</div>
-      <div class="threshold-item caution">10–&lt;25mm — Elevated rainfall risk</div>
-      <div class="threshold-item flood">≥25mm — High rainfall risk</div>
-    </div>
-    <p class="total-rain">Guide only: these cutoffs are not calibrated to flooding at these crossings. All cards use the same upstream rainfall sample; local conditions can differ.</p>
-  </div>
+  <details class="report-box" id="reportBox">
+    <summary>Record what you found</summary>
+    <p class="help-text">Private to this browser on this device. Reports are not uploaded or shared. Clearing browser data removes them; export a copy to keep your history.</p>
+    <form id="reportForm">
+      <label for="reportCrossing">Crossing</label>
+      <select id="reportCrossing" required></select>
+      <label for="reportCondition">Observed condition</label>
+      <select id="reportCondition" required>
+        <option value="">Choose a condition</option>
+        <option value="dry">Dry</option><option value="puddled">Puddled</option><option value="flooded">Flooded</option>
+      </select>
+      <label for="reportDirection">Direction</label>
+      <select id="reportDirection"><option value="south">Toward the city · southbound</option><option value="north">Away from the city · northbound</option></select>
+      <label for="reportTime">Observed at · Melbourne time</label>
+      <input id="reportTime" type="datetime-local" required>
+      <label for="reportNote">Note (optional)</label>
+      <textarea id="reportNote" maxlength="280" rows="2" placeholder="Which low point, water on the path, debris…"></textarea>
+      <button type="submit" class="action-btn">Save on this device</button>
+      <button type="button" class="action-btn secondary" id="exportReports">Export private history</button>
+    </form>
+    <p class="help-text" id="reportMessage" role="status"></p>
+  </details>
+
+  <section class="source-notes">
+    <h2>Other checks</h2>
+    <p><a href="https://isthecapitalcitytrailflooded.com/" target="_blank" rel="noopener noreferrer">Community trail reports ↗</a> · Opens the separate public reporting site; its reports are not imported here.</p>
+    <p><a href="https://bigbuild.vic.gov.au/projects/west-gate-tunnel-project" target="_blank" rel="noopener noreferrer">Official project and route updates ↗</a> · Check for works and closures before riding.</p>
+    <p class="help-text">Pump status and current closure notices are not available as verified feeds here. Absence of a warning is not confirmation that a crossing is open.</p>
+  </section>
 
   <div class="updated-at" id="updatedAt"></div>
 
   <div class="footer">
-    <div>Rainfall: <a href="https://open-meteo.com/en/docs" target="_blank" rel="noopener noreferrer">Open-Meteo weather model</a> · Upstream sample: 37.74°S, 144.91°E. This is not a catchment-wide measurement.</div>
-    <div>Flooding background: <a href="https://bicyclenetwork.com.au/newsroom/2023/07/14/inundation-of-the-moonee-ponds-creek-trail/" target="_blank" rel="noopener noreferrer">Bicycle Network, July 2023</a> — historical reporting, not a current closure notice.</div>
+    <p>Creek and measured rain: <a href="https://www.melbournewater.com.au/water-and-environment/water-management/rainfall-and-river-levels" target="_blank" rel="noopener noreferrer">Melbourne Water</a>. Gauge timestamps have no UTC offset; interpreted as Melbourne local time. Creek heights use each gauge’s reference and are not path depths.</p>
+    <p>Tides: <a href="https://ports.vic.gov.au/boating-and-events/tides-waves-winds-weather/" target="_blank" rel="noopener noreferrer">Ports Victoria / OMC</a>. Breakwater Pier is a downstream proxy, not a creek sensor. Feed height datum is unspecified; do not compare its absolute height with creek gauges.</p>
+    <p>Modelled rain: <a href="https://open-meteo.com/en/docs" target="_blank" rel="noopener noreferrer">Open-Meteo</a>, upstream sample at 37.74°S, 144.91°E. Forecasts are separate from measured rain.</p>
+    <p><a href="https://bicyclenetwork.com.au/newsroom/2023/07/14/inundation-of-the-moonee-ponds-creek-trail/" target="_blank" rel="noopener noreferrer">Flooding and pump background · July 2023</a>, not a current closure notice.</p>
   </div>
 
 </div>
 
-<script>
-// Lower creek corridor used in both commute directions, north to south.
-// Rail crossings are grouped: the activity map does not name each structure.
-const UNDERPASSES = [
-  {
-    name: "Racecourse Rd",
-    note: "Northern end of the creek section, near the Royal Park connection.",
-  },
-  {
-    name: "Macaulay Rd",
-    note: "Creek crossing between Kensington and North Melbourne.",
-  },
-  {
-    name: "Arden St",
-    note: "Creek crossing south of Macaulay Road.",
-  },
-  {
-    name: "Dynon Rd",
-    note: "Northern end of the lower section affected by rain, tides and drainage.",
-  },
-  {
-    name: "Dynon–Footscray rail underpasses",
-    note: "Grouped rail crossings beside the creek. Flooding and pump problems have been reported here.",
-  },
-  {
-    name: "Footscray Rd",
-    note: "Southern end of the creek section, toward Docklands. Check the creek-level path separately from elevated bridge routes.",
-  },
-];
-
-// One upstream weather-model sample, not a flood gauge or catchment average.
-const LAT = -37.74;
-const LNG = 144.91;
-const TIME_ZONE = 'Australia/Melbourne';
-
-async function loadData() {
-  const btn = document.getElementById('refreshBtn');
-  if (btn.disabled) return;
-  btn.disabled = true;
-  btn.classList.add('spinning');
-
-  const errorEl = document.getElementById('errorMsg');
-  errorEl.style.display = 'none';
-
-  try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LNG}&hourly=precipitation&timezone=Australia%2FMelbourne&timeformat=unixtime&forecast_days=2&past_days=1`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('API error');
-    const data = await res.json();
-
-    const times = data.hourly?.time;
-    const rain = data.hourly?.precipitation;
-    if (!Array.isArray(times) || !Array.isArray(rain)) throw new Error('Missing hourly data');
-
-    const now = new Date();
-    const nowHour = Math.floor(now.getTime() / 3600000) * 3600;
-
-    // Unix seconds avoid interpreting Melbourne hours in the viewer's timezone.
-    const nowIdx = times.indexOf(nowHour);
-    if (nowIdx < 5 || nowIdx + 3 >= times.length) throw new Error('Incomplete rainfall window');
-
-    // Precipitation is the sum of the PRECEDING hour: include nowIdx in the past.
-    const past6 = [];
-    const next3 = [];
-    for (let i = nowIdx - 5; i <= nowIdx + 3; i++) {
-      if (times[i] !== nowHour + (i - nowIdx) * 3600 || !Number.isFinite(rain[i]) || rain[i] < 0) {
-        throw new Error('Missing rainfall observation');
-      }
-      const past = i <= nowIdx;
-      (past ? past6 : next3).push({ time: times[i], mm: rain[i], past });
-    }
-
-    const allBars = [...past6, ...next3];
-    const past6Total = past6.reduce((s, b) => s + b.mm, 0);
-    const next3Total = next3.reduce((s, b) => s + b.mm, 0);
-
-    renderBars(allBars);
-    renderTotals(past6Total, next3Total);
-    renderUnderpasses(past6Total);
-
-    document.getElementById('updatedAt').textContent =
-      `Updated: ${now.toLocaleTimeString('en-AU', { timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit' })} · ${now.toLocaleDateString('en-AU', { timeZone: TIME_ZONE, weekday: 'short', day: 'numeric', month: 'short' })} · Melbourne time`;
-
-  } catch (e) {
-    errorEl.style.display = 'block';
-    document.getElementById('rainTotals').textContent = 'Unavailable';
-    document.getElementById('rainBars').innerHTML = '';
-    document.getElementById('updatedAt').textContent = '';
-    renderUnderpasses(null);
-  } finally {
-    btn.classList.remove('spinning');
-    btn.disabled = false;
-  }
-}
-
-function renderBars(bars) {
-  const container = document.getElementById('rainBars');
-  const maxMm = Math.max(...bars.map(b => b.mm), 1);
-
-  container.innerHTML = bars.map(b => {
-    const pct = Math.max((b.mm / maxMm) * 100, 3);
-    const label = formatHour(b.time);
-    return `
-      <div class="bar-wrap">
-        <div class="bar ${b.past ? 'past' : 'future'}" style="height:${pct}%" title="${b.mm.toFixed(1)}mm"></div>
-        <div class="bar-label">${label}</div>
-      </div>
-    `;
-  }).join('');
-}
-
-function formatHour(unixSeconds) {
-  const h = Number(new Intl.DateTimeFormat('en-AU', {
-    timeZone: TIME_ZONE, hour: 'numeric', hourCycle: 'h23',
-  }).format(new Date(unixSeconds * 1000)));
-  if (h === 0) return '12a';
-  if (h < 12) return h + 'a';
-  if (h === 12) return '12p';
-  return (h - 12) + 'p';
-}
-
-function renderTotals(past6, next3) {
-  document.getElementById('rainTotals').innerHTML =
-    `Last 6 completed hours: <strong>${past6.toFixed(1)}mm</strong> &nbsp;·&nbsp; Following 3h forecast: <strong>${next3.toFixed(1)}mm</strong>`;
-}
-
-function getStatus(past6mm) {
-  if (!Number.isFinite(past6mm) || past6mm < 0) return { cls: 'loading', label: 'Unknown', icon: '?' };
-  if (past6mm >= 25) return { cls: 'flood', label: 'High rainfall risk', icon: '⚠' };
-  if (past6mm >= 10) return { cls: 'caution', label: 'Elevated rainfall risk', icon: '⚡' };
-  return { cls: 'clear', label: 'Low rainfall risk', icon: '•' };
-}
-
-function renderUnderpasses(past6) {
-  const list = document.getElementById('underpassList');
-  list.innerHTML = UNDERPASSES.map((u, i) => {
-    const s = getStatus(past6);
-    const delay = i * 0.07;
-    return `
-      <div class="underpass-card ${s.cls}" style="animation-delay:${delay}s">
-        <div class="status-icon">${s.icon}</div>
-        <div class="underpass-info">
-          <div class="underpass-name">${u.name}</div>
-          <div class="underpass-note">${u.note}</div>
-        </div>
-        <div class="status-badge">${s.label}</div>
-      </div>
-    `;
-  }).join('');
-}
-
-loadData();
-
-// Auto-refresh every 30 minutes
-setInterval(loadData, 30 * 60 * 1000);
-</script>
+<script type="module" src="./app.mjs"></script>
 </body>
 </html>
